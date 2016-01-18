@@ -9,9 +9,9 @@ require(tidyr)
 
 # database connection -------------------------------------------------------------------------
 
-host <- read.csv(".db_con", stringsAsFactors = FALSE)$host
+db_con <- read.csv(".db_con", stringsAsFactors = FALSE)
 
-nba_db <- src_postgres("nba", host)
+nba_db <- src_postgres("nba", db_con$host)
 
 
 # metadata df ---------------------------------------------------------------------------------
@@ -55,7 +55,8 @@ get_nba_data <- function(id = NA, table, season = "2015-16") {
     
     # all other tables besides players need an id
     if (is.na(id) && table != "players") {
-        stop(paste0("Set id = <", metadata$id_type[metadata$table == table], " id> to get data for ", table, "."))
+        stop(paste0("Set id = <", metadata$id_type[metadata$table == table],
+                    " id> to get data for ", table, "."))
     }
     
     # parameterize url
@@ -140,7 +141,9 @@ initial_state <- expand.grid(game_id = unique(team_games$game_id),
            score = "0 - 0")
 
 # scoring plays
-play_by_play_scoring <- mclapply(unique(team_games$game_id), get_nba_data, "play_by_play_scoring", mc.cores = detectCores()) %>%
+play_by_play_scoring <- mclapply(unique(team_games$game_id),
+                                 get_nba_data, "play_by_play_scoring",
+                                 mc.cores = detectCores()) %>%
     bind_rows %>%
     group_by(game_id) %>%
     filter(!is.na(scoremargin),
