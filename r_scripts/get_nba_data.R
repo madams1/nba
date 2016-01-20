@@ -6,8 +6,6 @@ require(lubridate)
 require(parallel)
 require(tidyr)
 
-system.time({
-
 # database connection -------------------------------------------------------------------------
 
 db_con <- read.csv(".db_con", stringsAsFactors = FALSE)
@@ -197,5 +195,3 @@ play_by_play_scoring <- mclapply(unique(team_games$game_id),
 
 copy_to(nba_db, play_by_play_scoring, temporary = FALSE)
 db_create_index(nba_db$con, "play_by_play_scoring", "game_id")
-
-})
