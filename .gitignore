@@ -3,3 +3,4 @@
 .RData
 .db_con
 team_shot_heatmaps/
+node_modules/
