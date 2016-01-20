@@ -6,6 +6,7 @@ require(lubridate)
 require(parallel)
 require(tidyr)
 
+system.time({
 
 # database connection -------------------------------------------------------------------------
 
@@ -16,7 +17,7 @@ nba_db <- src_postgres("nba", db_con$host)
 
 # metadata df ---------------------------------------------------------------------------------
 
-# set up df with (table_name, url) to abstract get_info/get_stats functions
+# tables in db
 metadata <- data_frame(table = c("teams",
                                  "players",
                                  "team_games",
@@ -35,12 +36,22 @@ metadata <- data_frame(table = c("teams",
                                       "&SeasonType=Regular+Season&TeamID=0&VsConference=&VsDivision=",
                                       "&mode=Advanced&showDetails=0&showShots=1&showZones=1"),
                                paste0("http://stats.nba.com/stats/playbyplay?EndPeriod=10&EndRange=55800&GameID=",
-                                      "<id>&RangeType=2",
+                                      "00<id>&RangeType=2",
                                       "&Season=<season>",
                                       "&SeasonType=Regular+Season&",
                                       "StartPeriod=1&StartRange=0")))
 
-copy_to(nba_db, metadata, temporary = FALSE)
+# drop existing tables
+sapply(metadata$table, function(x) {
+    if (db_has_table(nba_db$con, x)) {
+        db_drop_table(nba_db$con, x)
+    }
+})
+
+# write to db if table doesn't already exist
+if (!db_has_table(nba_db$con, "metadata")) {
+    copy_to(nba_db, metadata, temporary = FALSE)
+}
 
 # function to get data from url
 
@@ -75,7 +86,10 @@ get_nba_data <- function(id = NA, table, season = "2015-16") {
     
     if (nrow(df) > 0) {
         colnames(df) <- headers
-        df
+        
+        # convert any ids to numerics
+        df %>% mutate_each("as.numeric", contains("id"))
+        
     } else {
         NULL
     }
@@ -89,9 +103,11 @@ get_nba_data <- function(id = NA, table, season = "2015-16") {
 
 players <- get_nba_data(table = "players") %>%
     select(id = person_id, everything(), -contains("team"), team_id) %>%
-    filter(games_played_flag == "Y", rosterstatus == "1")
+    filter(games_played_flag == "Y", rosterstatus == "1") %>%
+    mutate_each("as.numeric", from_year, to_year)
 
 copy_to(nba_db, players, temporary = FALSE)
+db_create_index(nba_db$con, "players", c("id", "team_id"))
 
 # teams ---------------------------------------------------------------------------------------
 
@@ -99,19 +115,26 @@ copy_to(nba_db, players, temporary = FALSE)
 
 teams <- mclapply(unique(players$team_id), get_nba_data, "teams", mc.cores = detectCores()) %>%
     bind_rows %>%
-    rename(id = team_id)
+    rename(id = team_id) %>%
+    mutate_each("as.numeric", w:max_year)
 
 copy_to(nba_db, teams, temporary = FALSE)
-
+db_create_index(nba_db$con, "teams", "id")
 
 # player_shots --------------------------------------------------------------------------------
 
 # update once daily
 
 player_shots <- mclapply(players$id, get_nba_data, "player_shots", mc.cores = detectCores()) %>%
-    bind_rows
+    bind_rows %>%
+    select(-grid_type) %>%
+    mutate_each("as.numeric", period:seconds_remaining, shot_distance:loc_y) %>%
+    mutate_each(funs(as.logical(as.numeric(.))),
+                shot_attempted_flag:shot_made_flag)
 
 copy_to(nba_db, player_shots, temporary = FALSE)
+db_create_index(nba_db$con, "player_shots",
+                c("game_id", "game_event_id", "player_id", "team_id"))
 
 # team_games ----------------------------------------------------------------------------------
 
@@ -120,11 +143,15 @@ copy_to(nba_db, player_shots, temporary = FALSE)
 team_games <- mclapply(teams$id, get_nba_data, "team_games", mc.cores = detectCores()) %>%
     bind_rows %>%
     mutate_each("as.numeric", min:ncol(.)) %>%
-    mutate(game_date = as.Date(mdy(game_date)),
-           home = str_detect(matchup, "vs\\."))
+    mutate(opponent_abbreviation = str_sub(matchup, -3, -1),
+           game_date = as.Date(mdy(game_date)),
+           home = str_detect(matchup, "vs\\.")) %>%
+    inner_join(teams %>% select(opponent_id = id,
+                                opponent_abbreviation = team_abbreviation)) %>%
+    select(-opponent_abbreviation)
 
 copy_to(nba_db, team_games, temporary = FALSE)
-
+db_create_index(nba_db$con, "team_games", c("team_id", "game_id", "opponent_id"))
 
 # play_by_play --------------------------------------------------------------------------------
 
@@ -160,10 +187,15 @@ play_by_play_scoring <- mclapply(unique(team_games$game_id),
     full_join(initial_state) %>%
     group_by(game_id, home) %>%
     arrange(seconds_in) %>%
-    mutate(time_interval = cut(seconds_in, breaks = 97, labels = FALSE) - 1) %>%
+    mutate(time_interval = cut(seconds_in, breaks = seq(0, 2880, by = 30),
+                               labels = FALSE)) %>%
     ungroup %>%
+    mutate(time_interval = ifelse(is.na(time_interval), 0, time_interval)) %>%
     group_by(game_id, home, time_interval) %>%
     slice(n()) %>%
     ungroup
 
 copy_to(nba_db, play_by_play_scoring, temporary = FALSE)
+db_create_index(nba_db$con, "play_by_play_scoring", "game_id")
+
+})

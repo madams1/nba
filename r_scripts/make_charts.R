@@ -36,8 +36,7 @@ team_shots <- tbl(nba_db, "teams") %>%
     inner_join(tbl(nba_db, "player_shots"),
                by = c("id" = "team_id")) %>%
     select(team_id = id, team_abbreviation, loc_x, loc_y) %>%
-    collect %>%
-    mutate_each("as.numeric", loc_x:loc_y)
+    collect
 
 pal <- plasma(32)
 
