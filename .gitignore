@@ -2,5 +2,5 @@
 .Rhistory
 .RData
 .db_con
-team_shot_heatmaps/
+src/
 node_modules/

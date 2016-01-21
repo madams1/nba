@@ -62,7 +62,7 @@ make_team_heatmap <- function(id) {
     
     ggsave(paste0(team_abbr, "_shot_hm.svg"), shot_hm,
            width = 5.2, height = 3.3, units = "cm",
-           path = "src/team_shot_heatmaps")
+           path = "src/team_shot_heatmaps", bg = "transparent")
     
 }
 

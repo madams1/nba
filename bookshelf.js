@@ -3,7 +3,7 @@
 var knex = require("knex")({
     client: "pg",
     connection: {
-        host: "localhost",
+        host: "192.168.11.5",
         database: "nba",
         charsest: "utf8"
     }

@@ -1,18 +1,26 @@
+head
+    title NBA teams
+    link(href="styles/main.css", rel="stylesheet")
 
 - var team_confs = _.uniqWith(_.map(teams, function(team) {
 -   return { team_conference: team.team_conference, team_division: team.team_division };
 - }), _.isEqual);
 - var confs = _.uniq(_.map(team_confs, function(x) { return x.team_conference; }));
 
-
-ul
-each conf in confs
-    h1 #{conf}
-    each tc in team_confs
-        if tc.team_conference === conf
-            h3 #{tc.team_division}
-            each team in teams
-                if tc.team_division === team.team_division
-                    - var team_abb = team.team_abbreviation.toLowerCase();
-                    img(src="team_shot_heatmaps/#{team_abb}_shot_hm.svg")
-                    p #{team.team_city} #{team.team_name}
+body
+    ul
+    each conf in confs
+        if conf === "East"
+            h1.east_title #{conf.toUpperCase()}
+        else
+            h1.west_title #{conf.toUpperCase()}
+        each tc in team_confs
+            if tc.team_conference === conf
+                h3 #{tc.team_division.toUpperCase()}
+                each team in teams
+                    if tc.team_division === team.team_division
+                        - var team_abb = team.team_abbreviation;
+                        .team_window
+                            img(src="team_shot_heatmaps/#{team_abb.toLowerCase()}_shot_hm.svg")
+                            p #{team.team_city} #{team.team_name}
+                            img.team_logo(src="http://stats.nba.com/media/img/teams/logos/#{team_abb}_logo.svg")
