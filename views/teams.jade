@@ -21,6 +21,6 @@ body
                     if tc.team_division === team.team_division
                         - var team_abb = team.team_abbreviation;
                         .team_window
-                            img(src="team_shot_heatmaps/#{team_abb.toLowerCase()}_shot_hm.svg")
+                            img(src="team_shot_heatmaps/#{team_abb.toLowerCase()}_shot_hm.svg" width="160px")
                             p #{team.team_city} #{team.team_name}
                             img.team_logo(src="http://stats.nba.com/media/img/teams/logos/#{team_abb}_logo.svg")

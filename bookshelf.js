@@ -3,7 +3,7 @@
 var knex = require("knex")({
     client: "pg",
     connection: {
-        host: "192.168.11.5",
+        host: "powerbear.local",
         database: "nba",
         charsest: "utf8"
     }
